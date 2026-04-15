@@ -48,7 +48,7 @@
     <h2>Add Holding</h2>
     <div class="grid">
       <div class="searchbox">
-        <input id="search" placeholder="Search NSE stocks..." autocomplete="off" />
+        <input id="search" placeholder="Search stocks..." autocomplete="off" />
         <div id="dd" class="dropdown"></div>
       </div>
       <input id="price" type="number" placeholder="Current Price" />
@@ -83,11 +83,6 @@
 </div>
 
 <script>
-async function searchStocks(query) {
-  const res = await fetch(`/search?q=${encodeURIComponent(query)}`);
-  return await res.json();
-}
-
 let selected = null;
 let holdings = JSON.parse(localStorage.getItem('holdings') || '[]');
 
@@ -104,6 +99,7 @@ function setStatus(msg, cls='muted') {
 
 function render() {
   $('count').textContent = holdings.length;
+
   $('body').innerHTML = holdings.map((h, i) => {
     const invested = h.qty * h.avg;
     const current = h.qty * h.price;
@@ -148,46 +144,63 @@ function setupDropdown() {
   const input = $('search');
   const dd = $('dd');
   let t = null;
+
   input.addEventListener('input', e => {
     clearTimeout(t);
-    const q = e.target.value.trim().toUpperCase();
-    if (!q) {
+    const q = e.target.value.trim();
+    selected = null;
+
+    if (q.length < 2) {
       dd.style.display = 'none';
       dd.innerHTML = '';
       return;
     }
-    t = setTimeout(() => {
-      const matches = INDIAN_STOCKS.filter(s =>
-        s.symbol.includes(q) || s.name.toUpperCase().includes(q)
-      ).slice(0, 10);
-      dd.innerHTML = matches.length
-        ? matches.map(s => `
-            <div class="item" data-symbol="${s.symbol}" data-name="${escapeHtml(s.name)}" data-exchange="${s.exchange}">
-              <div><b>${s.symbol}</b></div>
-              <div class="small">${s.name}</div>
-            </div>
-          `).join('')
-        : '<div class="item">No stocks found</div>';
-      dd.style.display = 'block';
-    }, 100);
+
+    t = setTimeout(async () => {
+      try {
+        setStatus('Searching...', 'muted');
+        const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+
+        const items = Array.isArray(data) ? data : (data.results || data.data || []);
+        dd.innerHTML = items.length
+          ? items.slice(0, 12).map(s => `
+              <div class="item" data-symbol="${escapeHtml(s.symbol || s.ticker || '')}" data-name="${escapeHtml(s.name || s.company_name || s.symbol || '')}" data-exchange="${escapeHtml(s.exchange || s.market || 'NSE')}">
+                <div><b>${s.symbol || s.ticker || ''}</b></div>
+                <div class="small">${s.name || s.company_name || ''}</div>
+              </div>
+            `).join('')
+          : '<div class="item">No stocks found</div>';
+
+        dd.style.display = 'block';
+        setStatus('Ready', 'muted');
+      } catch (err) {
+        dd.style.display = 'none';
+        setStatus('Search error', 'err');
+      }
+    }, 250);
   });
 
   dd.addEventListener('click', async (e) => {
     const item = e.target.closest('.item');
     if (!item || !item.dataset.symbol) return;
+
     selected = {
-      symbol: item.dataset.symbol,
+      symbol: item.dataset.symbol.trim().toUpperCase(),
       name: item.dataset.name,
-      exchange: item.dataset.exchange
+      exchange: (item.dataset.exchange || 'NSE').trim().toUpperCase()
     };
+
     input.value = `${selected.symbol} - ${selected.name}`;
     dd.style.display = 'none';
     $('price').value = '';
     $('price').disabled = false;
+
     setStatus('Fetching live price...', 'muted');
     const price = await fetchPrice(selected.symbol, selected.exchange);
+
     if (price) {
-      $('price').value = price.toFixed(2);
+      $('price').value = Number(price).toFixed(2);
       $('price').disabled = true;
       setStatus('Live price loaded', 'ok');
     } else {
@@ -201,10 +214,11 @@ function setupDropdown() {
 }
 
 async function fetchPrice(symbol, exchange) {
-  const res = await fetch(`/price?symbol=${encodeURIComponent(symbol)}&exchange=${encodeURIComponent(exchange)}`);
-  const data = await res.json();
-  return data.price;
-} catch (e) {
+  try {
+    const res = await fetch(`/price?symbol=${encodeURIComponent(symbol)}&exchange=${encodeURIComponent(exchange)}`);
+    const data = await res.json();
+    return data.price;
+  } catch (e) {
     return null;
   }
 }
@@ -214,7 +228,11 @@ $('add').addEventListener('click', () => {
   const price = parseFloat($('price').value);
   const qty = parseFloat($('qty').value);
   const avg = parseFloat($('avg').value);
-  if (!Number.isFinite(price) || !Number.isFinite(qty) || !Number.isFinite(avg)) return setStatus('Fill all fields', 'err');
+
+  if (!Number.isFinite(price) || !Number.isFinite(qty) || !Number.isFinite(avg)) {
+    return setStatus('Fill all fields', 'err');
+  }
+
   holdings.push({ symbol: selected.symbol, name: selected.name, price, qty, avg });
   save();
   render();
