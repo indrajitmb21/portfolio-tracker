@@ -19,7 +19,7 @@ export async function onRequest(context) {
   try {
     const res = await fetch(`${API_BASE}/stock?symbol=${encodeURIComponent(apiSymbol)}&res=num`);
     const data = await res.json();
-    const price = data?.data?.last_price ?? data?.price ?? null;
+    const price = data?.data?.last_price ?? data?.price ?? data?.ltp ?? null;
 
     return new Response(JSON.stringify({ symbol, exchange, price, raw: data }), {
       headers: {
