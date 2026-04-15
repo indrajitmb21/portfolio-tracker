@@ -56,7 +56,7 @@
       <input id="avg" type="number" placeholder="Avg Buy Price" step="0.01" />
       <button id="add">Add</button>
     </div>
-    <div id="status" class="small muted" style="margin-top:10px;">Ready</div>
+    <div id="status" class="small muted" style="margin-top:10px;">Loading stock list...</div>
   </div>
 
   <div class="card">
@@ -85,6 +85,7 @@
 <script>
 let selected = null;
 let holdings = JSON.parse(localStorage.getItem('holdings') || '[]');
+let allStocks = [];
 const $ = id => document.getElementById(id);
 
 function save(){ localStorage.setItem('holdings', JSON.stringify(holdings)); }
@@ -108,15 +109,28 @@ function render(){
 }
 
 function removeHolding(i){ holdings.splice(i,1); save(); render(); }
-
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 async function fetchPrice(symbol, exchange){
   try{
     const res = await fetch(`/price?symbol=${encodeURIComponent(symbol)}&exchange=${encodeURIComponent(exchange)}`);
+    if (!res.ok) return null;
     const data = await res.json();
-    return data.price;
+    return data.price ?? null;
   }catch(e){ return null; }
+}
+
+async function loadStocks(){
+  try{
+    const res = await fetch('stocks.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('stocks.json missing');
+    const data = await res.json();
+    allStocks = Array.isArray(data) ? data : [];
+    setStatus(`Loaded ${allStocks.length} stocks`, 'ok');
+  }catch(e){
+    allStocks = [];
+    setStatus('stocks.json not found', 'err');
+  }
 }
 
 function setupDropdown(){
@@ -132,39 +146,26 @@ function setupDropdown(){
     if (q.length < 2){
       dd.style.display = 'none';
       dd.innerHTML = '';
-      setStatus('Ready', 'muted');
+      setStatus(allStocks.length ? `Loaded ${allStocks.length} stocks` : 'stocks.json not found', allStocks.length ? 'ok' : 'err');
       return;
     }
 
-    setStatus('Searching...', 'muted');
+    const items = allStocks.filter(s => {
+      const sym = String(s.symbol || '').toLowerCase();
+      const name = String(s.name || '').toLowerCase();
+      const ex = String(s.exchange || '').toLowerCase();
+      return sym.includes(q) || name.includes(q) || ex.includes(q);
+    }).slice(0, 12);
 
-    t = setTimeout(async () => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
+    dd.innerHTML = items.length ? items.map(s => {
+      const sym = s.symbol || '';
+      const name = s.name || sym;
+      const ex = s.exchange || 'NSE';
+      return `<div class="item" data-symbol="${esc(sym)}" data-name="${esc(name)}" data-exchange="${esc(ex)}"><div><b>${esc(sym)}</b></div><div class="small">${esc(name)} • ${esc(ex)}</div></div>`;
+    }).join('') : '<div class="item">No stocks found</div>';
 
-      try{
-        const res = await fetch(`/search?q=${encodeURIComponent(q)}`, { signal: controller.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const items = Array.isArray(data) ? data : [];
-
-        dd.innerHTML = items.length ? items.slice(0, 12).map(s => {
-          const sym = s.symbol || s.ticker || '';
-          const name = s.name || s.company_name || sym;
-          const ex = s.exchange || s.market || 'NSE';
-          return `<div class="item" data-symbol="${esc(sym)}" data-name="${esc(name)}" data-exchange="${esc(ex)}"><div><b>${esc(sym)}</b></div><div class="small">${esc(name)}</div></div>`;
-        }).join('') : '<div class="item">No stocks found</div>';
-
-        dd.style.display = 'block';
-        setStatus('Ready', 'muted');
-      }catch(err){
-        dd.style.display = 'none';
-        dd.innerHTML = '';
-        setStatus('Search error', 'err');
-      }finally{
-        clearTimeout(timer);
-      }
-    }, 150);
+    dd.style.display = 'block';
+    setStatus('Ready', 'muted');
   });
 
   dd.addEventListener('click', async e => {
@@ -203,16 +204,15 @@ $('add').addEventListener('click', () => {
   const price = parseFloat($('price').value), qty = parseFloat($('qty').value), avg = parseFloat($('avg').value);
   if (!Number.isFinite(price) || !Number.isFinite(qty) || !Number.isFinite(avg)) return setStatus('Fill all fields', 'err');
   holdings.push({ symbol: selected.symbol, name: selected.name, price, qty, avg });
-  save();
-  render();
-  setStatus('Added successfully', 'ok');
+  save(); render(); setStatus('Added successfully', 'ok');
 });
 
 $('refresh').addEventListener('click', async () => {
-  for (const h of holdings) { const p = await fetchPrice(h.symbol, 'NSE'); if (p) h.price = p; }
-  save();
-  render();
-  setStatus('Prices refreshed', 'ok');
+  for (const h of holdings) {
+    const p = await fetchPrice(h.symbol, 'NSE');
+    if (p !== null && p !== undefined) h.price = p;
+  }
+  save(); render(); setStatus('Prices refreshed', 'ok');
 });
 
 $('clear').addEventListener('click', () => {
@@ -222,8 +222,10 @@ $('clear').addEventListener('click', () => {
   render();
 });
 
-setupDropdown();
-render();
+loadStocks().then(() => {
+  setupDropdown();
+  render();
+});
 </script>
 </body>
 </html>
