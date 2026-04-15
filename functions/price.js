@@ -13,21 +13,14 @@ export async function onRequest(context) {
     });
   }
 
-  const API_BASE = "PASTE_REAL_API_BASE_HERE";
+  const API_BASE = "http://nse-api-khaki.vercel.app:5000";
   const apiSymbol = exchange === "BSE" ? `${symbol}.BO` : `${symbol}.NS`;
-  const apiUrl = `${API_BASE}/stock?symbol=${encodeURIComponent(apiSymbol)}`;
+  const apiUrl = `${API_BASE}/stock?symbol=${encodeURIComponent(apiSymbol)}&res=num`;
 
   try {
     const res = await fetch(apiUrl);
     const data = await res.json();
-
-    const price =
-      data?.price ??
-      data?.ltp ??
-      data?.lastPrice ??
-      data?.currentPrice ??
-      data?.data?.price ??
-      null;
+    const price = data?.data?.last_price ?? null;
 
     return new Response(JSON.stringify({
       symbol,
