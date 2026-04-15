@@ -6,10 +6,7 @@ export async function onRequest(context) {
   if (!symbol) {
     return new Response(JSON.stringify({ error: "Missing symbol" }), {
       status: 400,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
@@ -21,18 +18,12 @@ export async function onRequest(context) {
     const data = await res.json();
     const price = data?.data?.last_price ?? data?.price ?? data?.ltp ?? null;
 
-    return new Response(JSON.stringify({ symbol, exchange, price, raw: data }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+    return new Response(JSON.stringify({ symbol, exchange, price }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   } catch (err) {
     return new Response(JSON.stringify({ symbol, exchange, price: null }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 }
