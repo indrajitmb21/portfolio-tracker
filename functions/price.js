@@ -15,36 +15,20 @@ export async function onRequest(context) {
 
   const API_BASE = "http://nse-api-khaki.vercel.app:5000";
   const apiSymbol = exchange === "BSE" ? `${symbol}.BO` : `${symbol}.NS`;
-  const apiUrl = `${API_BASE}/stock?symbol=${encodeURIComponent(apiSymbol)}&res=num`;
 
   try {
-    const res = await fetch(apiUrl);
+    const res = await fetch(`${API_BASE}/stock?symbol=${encodeURIComponent(apiSymbol)}&res=num`);
     const data = await res.json();
+    const price = data?.data?.last_price ?? data?.price ?? null;
 
-    const price =
-      data?.data?.last_price ??
-      data?.price ??
-      data?.ltp ??
-      null;
-
-    return new Response(JSON.stringify({
-      symbol,
-      exchange,
-      price,
-      raw: data,
-    }), {
+    return new Response(JSON.stringify({ symbol, exchange, price, raw: data }), {
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
       },
     });
   } catch (err) {
-    return new Response(JSON.stringify({
-      symbol,
-      exchange,
-      price: null,
-      error: "price_failed",
-    }), {
+    return new Response(JSON.stringify({ symbol, exchange, price: null }), {
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
