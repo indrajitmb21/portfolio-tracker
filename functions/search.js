@@ -11,16 +11,13 @@ export async function onRequest(context) {
     });
   }
 
-  const apiUrl = `https://api.example.com/search?q=${encodeURIComponent(q)}`;
+  const API_BASE = "PASTE_REAL_API_BASE_HERE";
+  const apiUrl = `${API_BASE}/search?q=${encodeURIComponent(q)}`;
 
   try {
     const res = await fetch(apiUrl);
     const data = await res.json();
-
-    let results = [];
-    if (Array.isArray(data)) results = data;
-    else if (Array.isArray(data.results)) results = data.results;
-    else if (Array.isArray(data.data)) results = data.data;
+    const results = Array.isArray(data?.symbols) ? data.symbols : (Array.isArray(data) ? data : []);
 
     return new Response(JSON.stringify(results), {
       headers: {
