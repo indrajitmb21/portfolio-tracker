@@ -13,68 +13,42 @@ export async function onRequest(context) {
     });
   }
 
-  const yahooSymbol = `${symbol}.${exchange === "BSE" ? "BO" : "NS"}`;
-  const targets = [
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=1d`,
-    `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=1d`,
-  ];
+  const apiSymbol = exchange === "BSE" ? `${symbol}.BO` : `${symbol}.NS`;
+  const apiUrl = `https://api.example.com/stock?symbol=${encodeURIComponent(apiSymbol)}`;
 
-  for (const target of targets) {
-    try {
-      const res = await fetch(target, {
-        headers: {
-          "user-agent": "Mozilla/5.0",
-          "accept": "application/json",
-        },
-      });
+  try {
+    const res = await fetch(apiUrl);
+    const data = await res.json();
 
-      if (!res.ok) continue;
+    const price =
+      data?.price ??
+      data?.ltp ??
+      data?.lastPrice ??
+      data?.currentPrice ??
+      null;
 
-      const data = await res.json();
-      const result = data?.chart?.result?.[0];
-      const price = result?.meta?.regularMarketPrice;
-
-      if (Number.isFinite(price)) {
-        return new Response(JSON.stringify({
-          symbol,
-          exchange,
-          price,
-          source: "yahoo-meta",
-        }), {
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
-        });
-      }
-
-      const closes = result?.indicators?.quote?.[0]?.close || [];
-      const valid = closes.filter(v => v != null);
-      if (valid.length) {
-        return new Response(JSON.stringify({
-          symbol,
-          exchange,
-          price: valid[valid.length - 1],
-          source: "yahoo-close",
-        }), {
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
-        });
-      }
-    } catch (e) {}
+    return new Response(JSON.stringify({
+      symbol,
+      exchange,
+      price,
+      raw: data,
+    }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({
+      symbol,
+      exchange,
+      price: null,
+      error: "price_failed",
+    }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   }
-
-  return new Response(JSON.stringify({
-    symbol,
-    exchange,
-    price: null,
-    source: "failed",
-  }), {
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
 }
