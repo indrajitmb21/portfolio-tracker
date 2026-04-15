@@ -139,8 +139,12 @@ function setupDropdown(){
     setStatus('Searching...', 'muted');
 
     t = setTimeout(async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+
       try{
-        const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
+        const res = await fetch(`/search?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const items = Array.isArray(data) ? data : [];
 
@@ -157,6 +161,8 @@ function setupDropdown(){
         dd.style.display = 'none';
         dd.innerHTML = '';
         setStatus('Search error', 'err');
+      }finally{
+        clearTimeout(timer);
       }
     }, 150);
   });
@@ -197,12 +203,16 @@ $('add').addEventListener('click', () => {
   const price = parseFloat($('price').value), qty = parseFloat($('qty').value), avg = parseFloat($('avg').value);
   if (!Number.isFinite(price) || !Number.isFinite(qty) || !Number.isFinite(avg)) return setStatus('Fill all fields', 'err');
   holdings.push({ symbol: selected.symbol, name: selected.name, price, qty, avg });
-  save(); render(); setStatus('Added successfully', 'ok');
+  save();
+  render();
+  setStatus('Added successfully', 'ok');
 });
 
 $('refresh').addEventListener('click', async () => {
   for (const h of holdings) { const p = await fetchPrice(h.symbol, 'NSE'); if (p) h.price = p; }
-  save(); render(); setStatus('Prices refreshed', 'ok');
+  save();
+  render();
+  setStatus('Prices refreshed', 'ok');
 });
 
 $('clear').addEventListener('click', () => {
