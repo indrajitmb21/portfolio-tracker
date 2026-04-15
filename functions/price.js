@@ -1,15 +1,38 @@
 export async function onRequest(context) {
   const url = new URL(context.request.url);
   const symbol = (url.searchParams.get("symbol") || "").trim().toUpperCase();
+  const exchange = (url.searchParams.get("exchange") || "NSE").trim().toUpperCase();
 
-  return new Response(JSON.stringify({
-    symbol,
-    exchange: "NSE",
-    price: 1234.56
-  }), {
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
+  if (!symbol) {
+    return new Response(JSON.stringify({ error: "Missing symbol" }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
+  const API_BASE = "http://nse-api-khaki.vercel.app:5000";
+  const apiSymbol = exchange === "BSE" ? `${symbol}.BO` : `${symbol}.NS`;
+
+  try {
+    const res = await fetch(`${API_BASE}/stock?symbol=${encodeURIComponent(apiSymbol)}&res=num`);
+    const data = await res.json();
+    const price = data?.data?.last_price ?? data?.price ?? data?.ltp ?? null;
+
+    return new Response(JSON.stringify({ symbol, exchange, price, raw: data }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ symbol, exchange, price: null }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
 }
