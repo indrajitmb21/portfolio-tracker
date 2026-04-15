@@ -11,18 +11,16 @@ export async function onRequest(context) {
     });
   }
 
-  const apiUrl = `https://raw.githubusercontent.com/0xramm/Indian-Stock-Market-API/main/data/symbols.json`;
+  const apiUrl = `https://api.example.com/search?q=${encodeURIComponent(q)}`;
 
   try {
     const res = await fetch(apiUrl);
     const data = await res.json();
 
-    const query = q.toLowerCase();
-    const results = (Array.isArray(data) ? data : []).filter(item => {
-      const sym = String(item.symbol || item.ticker || "").toLowerCase();
-      const name = String(item.name || item.company_name || "").toLowerCase();
-      return sym.includes(query) || name.includes(query);
-    }).slice(0, 12);
+    let results = [];
+    if (Array.isArray(data)) results = data;
+    else if (Array.isArray(data.results)) results = data.results;
+    else if (Array.isArray(data.data)) results = data.data;
 
     return new Response(JSON.stringify(results), {
       headers: {
