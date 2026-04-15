@@ -110,7 +110,7 @@ const INDIAN_STOCKS = [
     { symbol: 'NTPC', name: 'NTPC Ltd', exchange: 'NSE' },
     { symbol: 'POWERGRID', name: 'Power Grid Corporation of India Ltd', exchange: 'NSE' },
     { symbol: 'TATAMOTORS', name: 'Tata Motors Ltd', exchange: 'NSE' },
-    { symbol: 'M&M', name: 'Mahindra & Mahindra Ltd', exchange: 'NSE' },
+    { symbol: 'M_M', name: 'Mahindra & Mahindra Ltd', exchange: 'NSE' },
     { symbol: 'TATASTEEL', name: 'Tata Steel Ltd', exchange: 'NSE' },
     { symbol: 'JSWSTEEL', name: 'JSW Steel Ltd', exchange: 'NSE' },
     { symbol: 'ADANIENT', name: 'Adani Enterprises Ltd', exchange: 'NSE' },
@@ -309,11 +309,15 @@ function render() {
       <td><button class="danger" onclick="removeHolding(${i})">Delete</button></td>
     </tr>`;
   }).join('');
+
   const total = holdings.reduce((s,h)=>s+h.qty*h.price,0);
   const invested = holdings.reduce((s,h)=>s+h.qty*h.avg,0);
+  const pnl = total - invested;
+  const nav = invested > 0 ? (total / invested) * 100 : 100;
+
   $('pvalue').textContent = '₹' + total.toLocaleString('en-IN',{minimumFractionDigits:2});
-  $('pnl').textContent = '₹' + (total-invested).toLocaleString('en-IN',{minimumFractionDigits:2});
-  $('nav').textContent = '100.00';
+  $('pnl').textContent = '₹' + pnl.toLocaleString('en-IN',{minimumFractionDigits:2});
+  $('nav').textContent = nav.toFixed(2);
 }
 
 function removeHolding(i) {
