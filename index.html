@@ -1,154 +1,59 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Portfolio Tracker</title>
-  <style>
-    body{font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:20px}
-    .wrap{max-width:1200px;margin:auto}
-    .card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:18px;margin-bottom:18px}
-    h1,h2{margin:0 0 14px}
-    .top{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
-    .metric{background:#0d1117;border:1px solid #30363d;border-radius:12px;padding:14px}
-    .metric .label{font-size:12px;color:#8b949e;text-transform:uppercase}
-    .metric .value{font-size:28px;font-weight:800;margin-top:6px}
-    .grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end}
-    input,button{padding:12px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;width:100%}
-    button{cursor:pointer;background:#238636;border:none;font-weight:700}
-    button.secondary{background:#21262d;border:1px solid #30363d}
-    button.danger{background:#da3633}
-    .searchbox{position:relative}
-    .dropdown{position:absolute;top:100%;left:0;right:0;background:#21262d;border:1px solid #30363d;border-radius:8px;max-height:260px;overflow:auto;display:none;z-index:9999}
-    .item{padding:10px;border-bottom:1px solid #30363d;cursor:pointer}
-    .item:hover{background:#161b22}
-    .small{font-size:12px;color:#8b949e}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:10px;border-bottom:1px solid #30363d;text-align:left;font-size:14px}
-    .ok{color:#3fb950}
-    .err{color:#f85149}
-    .muted{color:#8b949e}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .row > *{flex:1}
-  </style>
-</head>
-<body>
-<div class="wrap">
-  <div class="card">
-    <h1>Portfolio Tracker</h1>
-    <div class="top">
-      <div class="metric"><div class="label">Current NAV</div><div class="value" id="nav">100.00</div></div>
-      <div class="metric"><div class="label">Portfolio Value</div><div class="value" id="pvalue">₹0.00</div></div>
-      <div class="metric"><div class="label">P&L</div><div class="value" id="pnl">₹0.00</div></div>
-      <div class="metric"><div class="label">Holdings</div><div class="value" id="count">0</div></div>
-    </div>
-  </div>
+let masterSymbols = [];
 
-  <div class="card">
-    <h2>Add Holding</h2>
-    <div class="grid">
-      <div class="searchbox">
-        <input id="search" placeholder="Search stocks..." autocomplete="off" />
-        <div id="dd" class="dropdown"></div>
-      </div>
-      <input id="price" type="number" placeholder="Current Price" />
-      <input id="qty" type="number" placeholder="Quantity" step="0.0001" />
-      <input id="avg" type="number" placeholder="Avg Buy Price" step="0.01" />
-      <button id="add">Add</button>
-    </div>
-    <div id="status" class="small muted" style="margin-top:10px;">Ready</div>
-  </div>
-
-  <div class="card">
-    <div class="row" style="align-items:center;margin-bottom:10px;">
-      <h2 style="flex:2;margin:0;">Holdings</h2>
-      <button class="secondary" id="refresh">Refresh Prices</button>
-      <button class="danger" id="clear">Clear All</button>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Symbol</th>
-          <th>Name</th>
-          <th>Qty</th>
-          <th>Avg Buy</th>
-          <th>LTP</th>
-          <th>P&L</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="body"></tbody>
-    </table>
-  </div>
-</div>
-
-<script>
-let selected = null;
-let holdings = JSON.parse(localStorage.getItem('holdings') || '[]');
-const $ = id => document.getElementById(id);
-function save(){localStorage.setItem('holdings', JSON.stringify(holdings))}
-function setStatus(msg, cls='muted'){ $('status').textContent = msg; $('status').className = cls; }
-function render(){
-  $('count').textContent = holdings.length;
-  $('body').innerHTML = holdings.map((h, i) => {
-    const invested = h.qty * h.avg;
-    const current = h.qty * h.price;
-    const pnl = current - invested;
-    return `<tr><td>${h.symbol}</td><td>${h.name}</td><td>${h.qty}</td><td>₹${h.avg.toFixed(2)}</td><td>₹${h.price.toFixed(2)}</td><td class="${pnl>=0?'ok':'err'}">₹${pnl.toFixed(2)}</td><td><button class="danger" onclick="removeHolding(${i})">Delete</button></td></tr>`;
-  }).join('');
-  const total = holdings.reduce((s,h)=>s+h.qty*h.price,0);
-  const invested = holdings.reduce((s,h)=>s+h.qty*h.avg,0);
-  const pnl = total - invested;
-  const nav = invested > 0 ? (total / invested) * 100 : 100;
-  $('pvalue').textContent = '₹' + total.toLocaleString('en-IN',{minimumFractionDigits:2});
-  $('pnl').textContent = '₹' + pnl.toLocaleString('en-IN',{minimumFractionDigits:2});
-  $('nav').textContent = nav.toFixed(2);
-}
-function removeHolding(i){holdings.splice(i,1);save();render()}
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-async function searchStocks(q){
-  const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
+async function loadSymbols() {
+  const res = await fetch('/search?q=all');
   const data = await res.json();
-  return Array.isArray(data) ? data : [];
+  masterSymbols = Array.isArray(data) ? data : [];
 }
-function setupDropdown(){
+
+function setupDropdown() {
   const input = $('search');
   const dd = $('dd');
   let t = null;
+
   input.addEventListener('input', e => {
     clearTimeout(t);
-    const q = e.target.value.trim();
+    const q = e.target.value.trim().toLowerCase();
     selected = null;
-    if (q.length < 2){dd.style.display='none';dd.innerHTML='';return;}
-    t = setTimeout(async () => {
-      try{
-        setStatus('Searching...', 'muted');
-        const items = await searchStocks(q);
-        dd.innerHTML = items.length ? items.slice(0,12).map(s => {
-          const sym = s.symbol || s.ticker || '';
-          const name = s.name || s.company_name || sym;
-          const ex = s.exchange || s.market || 'NSE';
-          return `<div class="item" data-symbol="${esc(sym)}" data-name="${esc(name)}" data-exchange="${esc(ex)}"><div><b>${esc(sym)}</b></div><div class="small">${esc(name)}</div></div>`;
-        }).join('') : '<div class="item">No stocks found</div>';
-        dd.style.display = 'block';
-        setStatus('Ready', 'muted');
-      }catch(err){
-        dd.style.display='none';
-        setStatus('Search error', 'err');
-      }
-    }, 250);
+
+    if (q.length < 2) {
+      dd.style.display = 'none';
+      dd.innerHTML = '';
+      return;
+    }
+
+    t = setTimeout(() => {
+      const items = masterSymbols.filter(s => {
+        const sym = String(s.symbol || s.ticker || '').toLowerCase();
+        const name = String(s.name || s.company_name || '').toLowerCase();
+        return sym.includes(q) || name.includes(q);
+      }).slice(0, 12);
+
+      dd.innerHTML = items.length ? items.map(s => {
+        const sym = s.symbol || s.ticker || '';
+        const name = s.name || s.company_name || sym;
+        const ex = s.exchange || s.market || 'NSE';
+        return `<div class="item" data-symbol="${esc(sym)}" data-name="${esc(name)}" data-exchange="${esc(ex)}"><div><b>${esc(sym)}</b></div><div class="small">${esc(name)}</div></div>`;
+      }).join('') : '<div class="item">No stocks found</div>';
+
+      dd.style.display = 'block';
+    }, 100);
   });
+
   dd.addEventListener('click', async e => {
     const item = e.target.closest('.item');
     if (!item || !item.dataset.symbol) return;
-    selected = { symbol: item.dataset.symbol.trim().toUpperCase(), name: item.dataset.name, exchange: (item.dataset.exchange || 'NSE').trim().toUpperCase() };
+    selected = {
+      symbol: item.dataset.symbol.trim().toUpperCase(),
+      name: item.dataset.name,
+      exchange: (item.dataset.exchange || 'NSE').trim().toUpperCase()
+    };
     input.value = `${selected.symbol} - ${selected.name}`;
     dd.style.display = 'none';
     $('price').value = '';
     $('price').disabled = false;
-    setStatus('Fetching live price...', 'muted');
     const price = await fetchPrice(selected.symbol, selected.exchange);
-    if (price){
+    if (price) {
       $('price').value = Number(price).toFixed(2);
       $('price').disabled = true;
       setStatus('Live price loaded', 'ok');
@@ -156,28 +61,4 @@ function setupDropdown(){
       setStatus('Live price unavailable; enter manually', 'err');
     }
   });
-  document.addEventListener('click', e => { if (!e.target.closest('.searchbox')) dd.style.display = 'none'; });
 }
-async function fetchPrice(symbol, exchange){
-  try{
-    const res = await fetch(`/price?symbol=${encodeURIComponent(symbol)}&exchange=${encodeURIComponent(exchange)}`);
-    const data = await res.json();
-    return data.price;
-  }catch(e){ return null; }
-}
-$('add').addEventListener('click', () => {
-  if (!selected) return setStatus('Please select a stock first', 'err');
-  const price = parseFloat($('price').value), qty = parseFloat($('qty').value), avg = parseFloat($('avg').value);
-  if (!Number.isFinite(price) || !Number.isFinite(qty) || !Number.isFinite(avg)) return setStatus('Fill all fields', 'err');
-  holdings.push({ symbol: selected.symbol, name: selected.name, price, qty, avg });
-  save();render();setStatus('Added successfully', 'ok');
-});
-$('refresh').addEventListener('click', async () => {
-  for (const h of holdings) { const p = await fetchPrice(h.symbol, 'NSE'); if (p) h.price = p; }
-  save();render();setStatus('Prices refreshed', 'ok');
-});
-$('clear').addEventListener('click', () => { if (!confirm('Clear all holdings?')) return; holdings = []; save(); render(); });
-setupDropdown();render();
-</script>
-</body>
-</html>
