@@ -13,8 +13,9 @@ export async function onRequest(context) {
     });
   }
 
+  const API_BASE = "PASTE_REAL_API_BASE_HERE";
   const apiSymbol = exchange === "BSE" ? `${symbol}.BO` : `${symbol}.NS`;
-  const apiUrl = `https://api.example.com/stock?symbol=${encodeURIComponent(apiSymbol)}`;
+  const apiUrl = `${API_BASE}/stock?symbol=${encodeURIComponent(apiSymbol)}`;
 
   try {
     const res = await fetch(apiUrl);
@@ -25,6 +26,7 @@ export async function onRequest(context) {
       data?.ltp ??
       data?.lastPrice ??
       data?.currentPrice ??
+      data?.data?.price ??
       null;
 
     return new Response(JSON.stringify({
