@@ -87,7 +87,7 @@ let selected = null;
 let holdings = JSON.parse(localStorage.getItem('holdings') || '[]');
 const $ = id => document.getElementById(id);
 
-function save(){localStorage.setItem('holdings', JSON.stringify(holdings))}
+function save(){ localStorage.setItem('holdings', JSON.stringify(holdings)); }
 function setStatus(msg, cls='muted'){ $('status').textContent = msg; $('status').className = cls; }
 
 function render(){
@@ -107,9 +107,9 @@ function render(){
   $('nav').textContent = nav.toFixed(2);
 }
 
-function removeHolding(i){holdings.splice(i,1);save();render()}
+function removeHolding(i){ holdings.splice(i,1); save(); render(); }
 
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 async function fetchPrice(symbol, exchange){
   try{
@@ -130,14 +130,16 @@ function setupDropdown(){
     selected = null;
 
     if (q.length < 2){
-      dd.style.display='none';
-      dd.innerHTML='';
+      dd.style.display = 'none';
+      dd.innerHTML = '';
+      setStatus('Ready', 'muted');
       return;
     }
 
+    setStatus('Searching...', 'muted');
+
     t = setTimeout(async () => {
-      try {
-        setStatus('Searching...', 'muted');
+      try{
         const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
         const data = await res.json();
         const items = Array.isArray(data) ? data : [];
@@ -151,11 +153,12 @@ function setupDropdown(){
 
         dd.style.display = 'block';
         setStatus('Ready', 'muted');
-      } catch (err) {
+      }catch(err){
         dd.style.display = 'none';
+        dd.innerHTML = '';
         setStatus('Search error', 'err');
       }
-    }, 100);
+    }, 150);
   });
 
   dd.addEventListener('click', async e => {
@@ -175,7 +178,7 @@ function setupDropdown(){
     setStatus('Fetching live price...', 'muted');
 
     const price = await fetchPrice(selected.symbol, selected.exchange);
-    if (price){
+    if (price !== null && price !== undefined){
       $('price').value = Number(price).toFixed(2);
       $('price').disabled = true;
       setStatus('Live price loaded', 'ok');
@@ -194,15 +197,20 @@ $('add').addEventListener('click', () => {
   const price = parseFloat($('price').value), qty = parseFloat($('qty').value), avg = parseFloat($('avg').value);
   if (!Number.isFinite(price) || !Number.isFinite(qty) || !Number.isFinite(avg)) return setStatus('Fill all fields', 'err');
   holdings.push({ symbol: selected.symbol, name: selected.name, price, qty, avg });
-  save();render();setStatus('Added successfully', 'ok');
+  save(); render(); setStatus('Added successfully', 'ok');
 });
 
 $('refresh').addEventListener('click', async () => {
   for (const h of holdings) { const p = await fetchPrice(h.symbol, 'NSE'); if (p) h.price = p; }
-  save();render();setStatus('Prices refreshed', 'ok');
+  save(); render(); setStatus('Prices refreshed', 'ok');
 });
 
-$('clear').addEventListener('click', () => { if (!confirm('Clear all holdings?')) return; holdings = []; save(); render(); });
+$('clear').addEventListener('click', () => {
+  if (!confirm('Clear all holdings?')) return;
+  holdings = [];
+  save();
+  render();
+});
 
 setupDropdown();
 render();
