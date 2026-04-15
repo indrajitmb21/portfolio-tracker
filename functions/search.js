@@ -11,13 +11,13 @@ export async function onRequest(context) {
     });
   }
 
-  const API_BASE = "PASTE_REAL_API_BASE_HERE";
+  const API_BASE = "http://nse-api-khaki.vercel.app:5000";
   const apiUrl = `${API_BASE}/search?q=${encodeURIComponent(q)}`;
 
   try {
     const res = await fetch(apiUrl);
     const data = await res.json();
-    const results = Array.isArray(data?.symbols) ? data.symbols : (Array.isArray(data) ? data : []);
+    const results = Array.isArray(data?.results) ? data.results : [];
 
     return new Response(JSON.stringify(results), {
       headers: {
